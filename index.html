@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DropServer — GitHub Pages edition</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151c; --border:#232733; --text:#e8ebf1;
+    --muted:#8a90a2; --accent:#5b8cff; --accent2:#38d39f; --danger:#ff5c73;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:32px;
+  }
+  .wrap{ width:100%; max-width:780px; }
+  h1{ font-size:22px; font-weight:600; margin:0 0 4px; }
+  p.sub{ color:var(--muted); margin:0 0 20px; font-size:14px; line-height:1.5; }
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:18px 20px; margin-bottom:18px;
+  }
+  .panel h2{ font-size:14px; margin:0 0 12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:5px; }
+  .field input, .field select{
+    width:100%; background:#0a0c11; border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:9px 10px; font-size:13.5px; font-family:inherit;
+  }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--accent); }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .save-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); }
+  #drop{
+    border:2px dashed var(--border); border-radius:14px; padding:44px 24px;
+    text-align:center; cursor:pointer; transition:.15s border-color, .15s background;
+    background:var(--panel);
+  }
+  #drop.hover{ border-color:var(--accent); background:#141a2b; }
+  #drop.disabled{ opacity:.5; cursor:not-allowed; }
+  #drop .icon{ font-size:34px; margin-bottom:10px; }
+  #drop .hint{ color:var(--muted); font-size:12.5px; margin-top:6px; }
+  input[type=file]{ display:none; }
+  input[type=checkbox]{ width:auto; }
+  .btn{
+    display:inline-block; margin-top:12px; padding:9px 16px; border-radius:8px;
+    background:var(--accent); color:#fff; border:none; font-size:13.5px; font-weight:600;
+    cursor:pointer;
+  }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn.secondary{ background:#1b2030; border:1px solid var(--border); color:var(--text); }
+  #list{ margin-top:20px; display:flex; flex-direction:column; gap:12px; }
+  .item{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px;
+  }
+  .item .name{ font-weight:600; font-size:14px; word-break:break-all; }
+  .item .meta{ color:var(--muted); font-size:12px; margin-top:2px; }
+  .row{ display:flex; gap:8px; margin-top:9px; align-items:center; }
+  .cmd{
+    flex:1; background:#0a0c11; border:1px solid var(--border); border-radius:8px;
+    padding:8px 10px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12px; color:var(--accent2); overflow-x:auto; white-space:pre;
+  }
+  .copy{
+    background:#1b2030; border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:8px 12px; font-size:12.5px; cursor:pointer; white-space:nowrap;
+  }
+  .copy:hover{ background:#232a3d; }
+  .copy.copied{ background:var(--accent2); color:#04241a; border-color:var(--accent2); }
+  .bar{ height:4px; background:#1c2130; border-radius:4px; overflow:hidden; margin-top:10px; }
+  .bar .fill{ height:100%; width:0%; background:var(--accent); transition:width .15s linear; }
+  .error{ color:var(--danger); font-size:12px; margin-top:6px; }
+  .warn{ color:#f2b84b; font-size:12.5px; margin-top:8px; line-height:1.5; }
+  a.dl{ color:var(--accent); text-decoration:none; font-size:12px; }
+  a.dl:hover{ text-decoration:underline; }
+  details summary{ cursor:pointer; font-size:12.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DropServer <span style="color:var(--muted); font-weight:400;">— GitHub Pages edition</span></h1>
+  <p class="sub">
+    Static page, no backend of your own. Drop a file, it gets committed straight to your
+    GitHub repo via the GitHub API (from your browser), and you instantly get a real,
+    <code>wget</code>-able URL.
+  </p>
+
+  <div class="panel" id="configPanel">
+    <h2>Repository settings</h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="owner">GitHub owner / org</label>
+        <input id="owner" placeholder="e.g. octocat">
+      </div>
+      <div class="field">
+        <label for="repo">Repository</label>
+        <input id="repo" placeholder="e.g. my-files">
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="branch">Branch</label>
+        <input id="branch" placeholder="main" value="main">
+      </div>
+      <div class="field">
+        <label for="folder">Folder in repo (optional)</label>
+        <input id="folder" placeholder="uploads">
+      </div>
+    </div>
+    <div class="field">
+      <label for="token">GitHub personal access token</label>
+      <input id="token" type="password" placeholder="ghp_… (fine-grained, Contents: read & write, this repo only)">
+    </div>
+    <label class="save-row">
+      <input type="checkbox" id="saveLocal"> Remember these settings in this browser only (localStorage)
+    </label>
+    <details style="margin-top:10px;">
+      <summary>How do I get a token?</summary>
+      <div class="warn" style="color:var(--muted);">
+        GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+        Generate new token → restrict "Repository access" to this one repo → under
+        "Permissions" set <b>Contents: Read and write</b>. Nothing else is needed. The token
+        never leaves your browser except to talk directly to api.github.com.
+      </div>
+    </details>
+  </div>
+
+  <div id="drop">
+    <div class="icon">⇪</div>
+    <div>Drag & drop files here, or click to browse</div>
+    <div class="hint">Best for files under ~25&nbsp;MB (GitHub API content limit). Files are committed to your repo.</div>
+    <button class="btn" type="button" id="browseBtn">Browse files</button>
+    <input type="file" id="fileInput" multiple>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const drop = $('drop');
+const fileInput = $('fileInput');
+const browseBtn = $('browseBtn');
+const list = $('list');
+const saveLocal = $('saveLocal');
+
+const fields = ['owner','repo','branch','folder','token'];
+(function loadSettings(){
+  const saved = localStorage.getItem('dropserver_gh_settings');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      fields.forEach(f => { if (data[f] !== undefined) $(f).value = data[f]; });
+      saveLocal.checked = true;
+    } catch(e){}
+  }
+})();
+
+fields.forEach(f => $(f).addEventListener('input', persistIfEnabled));
+saveLocal.addEventListener('change', persistIfEnabled);
+
+function persistIfEnabled(){
+  if (saveLocal.checked){
+    const data = {};
+    fields.forEach(f => data[f] = $(f).value);
+    localStorage.setItem('dropserver_gh_settings', JSON.stringify(data));
+  } else {
+    localStorage.removeItem('dropserver_gh_settings');
+  }
+}
+
+browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+drop.addEventListener('click', () => fileInput.click());
+
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.add('hover');
+}));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.remove('hover');
+}));
+drop.addEventListener('drop', e => {
+  const files = e.dataTransfer.files;
+  if (files && files.length) uploadFiles(files);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) uploadFiles(fileInput.files);
+  fileInput.value = "";
+});
+
+function humanSize(bytes){
+  const units = ['B','KB','MB','GB'];
+  let i = 0; let n = bytes;
+  while (n >= 1024 && i < units.length-1){ n/=1024; i++; }
+  return n.toFixed(n < 10 && i>0 ? 1 : 0) + ' ' + units[i];
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function sanitizePathSegment(name){
+  return name.replace(/[\\/\0]/g,'_').trim() || 'file';
+}
+
+async function fileToBase64(file){
+  const buf = await file.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function uploadFiles(files){
+  const owner = $('owner').value.trim();
+  const repo = $('repo').value.trim();
+  const branch = ($('branch').value.trim() || 'main');
+  const folder = $('folder').value.trim().replace(/^\/+|\/+$/g,'');
+  const token = $('token').value.trim();
+
+  if (!owner || !repo || !token){
+    alert('Please fill in owner, repo, and a GitHub token first.');
+    return;
+  }
+  Array.from(files).forEach(f => uploadOne(f, owner, repo, branch, folder, token));
+}
+
+async function uploadOne(file, owner, repo, branch, folder, token){
+  const item = document.createElement('div');
+  item.className = 'item';
+  item.innerHTML = `
+    <div class="name">${escapeHtml(file.name)}</div>
+    <div class="meta">${humanSize(file.size)} • preparing…</div>
+    <div class="bar"><div class="fill"></div></div>
+    <div class="error" style="display:none;"></div>
+  `;
+  list.prepend(item);
+  const meta = item.querySelector('.meta');
+  const fill = item.querySelector('.fill');
+  const errBox = item.querySelector('.error');
+
+  try {
+    fill.style.width = '20%';
+    meta.textContent = `${humanSize(file.size)} • encoding…`;
+    const base64 = await fileToBase64(file);
+
+    const safeName = sanitizePathSegment(file.name);
+    const path = folder ? `${folder}/${safeName}` : safeName;
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+
+    fill.style.width = '55%';
+    meta.textContent = `${humanSize(file.size)} • checking for existing file…`;
+
+    // Check if file already exists to get its sha (needed to overwrite)
+    let sha;
+    try {
+      const existing = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
+      });
+      if (existing.status === 200){
+        const j = await existing.json();
+        sha = j.sha;
+      }
+    } catch(e){ /* ignore, treat as new file */ }
+
+    fill.style.width = '75%';
+    meta.textContent = `${humanSize(file.size)} • uploading to GitHub…`;
+
+    const body = {
+      message: `Add ${safeName} via DropServer`,
+      content: base64,
+      branch: branch,
+    };
+    if (sha) body.sha = sha;
+
+    const res = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok){
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.message || `GitHub API error (${res.status})`);
+    }
+
+    fill.style.width = '100%';
+    setTimeout(() => { item.querySelector('.bar').style.display = 'none'; }, 300);
+
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+    const jsdelivrUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${path}`;
+
+    meta.innerHTML = `${humanSize(file.size)} • committed to <b>${escapeHtml(branch)}</b> • <a class="dl" href="${rawUrl}" target="_blank">open raw link</a>`;
+
+    const row1 = document.createElement('div');
+    row1.className = 'row';
+    const cmd1 = `wget "${rawUrl}" -O "${safeName}"`;
+    row1.innerHTML = `<div class="cmd">${escapeHtml(cmd1)}</div><button class="copy">Copy</button>`;
+    row1.querySelector('.copy').addEventListener('click', (e) => copyText(cmd1, e.target));
+    item.appendChild(row1);
+
+    const note = document.createElement('div');
+    note.className = 'warn';
+    note.innerHTML = `raw.githubusercontent.com is live immediately. jsDelivr (cached CDN, faster worldwide) can take a few minutes to pick up new commits: <span style="color:var(--accent2)">${escapeHtml(jsdelivrUrl)}</span>`;
+    item.appendChild(note);
+
+  } catch(err){
+    item.querySelector('.bar').style.display = 'none';
+    meta.textContent = 'failed';
+    errBox.style.display = 'block';
+    errBox.textContent = err.message || String(err);
+  }
+}
+
+function copyText(text, btn){
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+  });
+}
+</script>
+</body>
+</html>
